@@ -1,35 +1,32 @@
 using System.Collections;
 using UnityEngine;
 
-public class player : MonoBehaviour
+public class Player : MonoBehaviour
 {
     public float speed;
     public float jumpForce;
-    public int maxJumps = 2;  // Número máximo de pulos
 
-    private int jumpsLeft;
+    private bool isFire;
     private bool isJumping;
+
+    public AudioSource walkSound;
+    public AudioSource jumpSound;
+    public AudioSource attackSound;
+
     private Animator anim;
     private Rigidbody2D rig;
-
-    private bool isAttacking;
 
     void Start()
     {
         anim = GetComponent<Animator>();
         rig = GetComponent<Rigidbody2D>();
-        jumpsLeft = maxJumps;
     }
 
     void Update()
     {
         Move();
         Jump();
-
-        if (Input.GetKeyDown(KeyCode.F) && !isJumping && !isAttacking)
-        {
-            StartCoroutine(AttackCoroutine());
-        }
+        Attack();
     }
 
     void Move()
@@ -37,9 +34,14 @@ public class player : MonoBehaviour
         float movement = Input.GetAxis("Horizontal");
         rig.velocity = new Vector2(movement * speed, rig.velocity.y);
 
+        if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.RightArrow))
+        {
+            walkSound.Play();
+        }
+
         if (movement > 0)
         {
-            if (!isJumping && !isAttacking)
+            if (!isJumping)
             {
                 anim.SetInteger("transition", 1);
             }
@@ -47,52 +49,58 @@ public class player : MonoBehaviour
         }
         else if (movement < 0)
         {
-            if (!isJumping && !isAttacking)
+            if (!isJumping)
             {
                 anim.SetInteger("transition", 1);
             }
             transform.eulerAngles = new Vector3(0, 180, 0);
         }
-        else if (movement == 0 && !isJumping && !isAttacking)
+        else if (movement == 0 && !isJumping && !isFire)
         {
+            walkSound.Stop();
             anim.SetInteger("transition", 0);
         }
     }
 
     void Jump()
     {
-        if (Input.GetKeyDown(KeyCode.Space) && jumpsLeft > 0 && !isJumping && !isAttacking)
+        if (Input.GetButtonDown("Jump") && !isJumping )
         {
-            rig.velocity = new Vector2(rig.velocity.x, 0);  // Zera a velocidade vertical antes do pulo
-            rig.AddForce(new Vector2(0, jumpForce), ForceMode2D.Impulse);
-            jumpsLeft--;
-            isJumping = true;
+            jumpSound.Play();
             anim.SetInteger("transition", 2);
+            rig.AddForce(new Vector2(0, jumpForce), ForceMode2D.Impulse);
+            isJumping = true;
+            walkSound.Stop();
         }
     }
 
-    IEnumerator AttackCoroutine()
+     void Attack()
+     {
+         if (Input.GetKeyDown(KeyCode.X) && !isFire)
+         {
+             StartCoroutine(FireCoroutine());
+         }
+     }
+
+     IEnumerator FireCoroutine()
+     {
+         attackSound.Play();
+         isFire = true;
+         anim.SetInteger("transition", 3);
+         yield return new WaitForSeconds(2f);
+         anim.SetInteger("transition", 0);
+         isFire = false;
+         walkSound.Stop();
+     }
+
+    void OnCollisionEnter2D(Collision2D coll)
     {
-        anim.SetInteger("transition", 4);
-        isAttacking = true;
-
-        // Adicione aqui qualquer lógica adicional para o ataque
-        // Por exemplo, espera por um tempo para a animação de ataque terminar
-        yield return new WaitForSeconds(1f);
-
-        isAttacking = false;
-        anim.SetInteger("transition", 0);
-    }
-
-    private void OnCollisionEnter2D(Collision2D collision)
-    {
-        if (collision.gameObject.layer == 3)
+        if (coll.gameObject.layer == 3)
         {
-            isJumping = false;
-            if (rig.velocity.y <= 0.1)  // Certifique-se de que o jogador está descendo antes de mudar para a animação de caminhada
+            if (isJumping)
             {
-                anim.SetInteger("transition", 0); // Muda para a transição de idle quando tocar no chão
-                jumpsLeft = maxJumps;  // Restaura os pulos quando tocar no chão
+                isJumping = false;
+                anim.SetInteger("transition", 0);
             }
         }
     }
